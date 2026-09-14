@@ -1,8 +1,10 @@
 # TinyKV
 
-Phase 0 + Phase 1 of the B+Tree distributed database project (see
+Phases 0–2 of the B+Tree distributed database project (see
 `../bplus-tree-distributed-database-plan.md`): a TCP client/server with an
-in-memory key-value store. No disk persistence yet — that starts in Phase 2.
+in-memory key-value store, plus a disk pager (`src/storage/pager.hpp`) that
+maps a database file onto checksummed 4 KiB pages. The server does not use
+the pager yet; that happens once the B+ tree layer exists.
 
 ## Build
 

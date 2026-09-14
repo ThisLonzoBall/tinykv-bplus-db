@@ -3,6 +3,7 @@
 // Minimal single-header test framework: enough for assertion-style unit
 // tests without pulling in a third-party dependency at this stage.
 
+#include <exception>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -33,7 +34,12 @@ inline int run_all() {
     for (const auto& test : registry()) {
         g_current_test = test.name;
         int failures_before = g_failures;
-        test.fn();
+        try {
+            test.fn();
+        } catch (const std::exception& e) {
+            std::cerr << "FAIL [" << test.name << "] uncaught exception: " << e.what() << "\n";
+            ++g_failures;
+        }
         if (g_failures == failures_before) {
             ++passed;
         }
@@ -54,6 +60,21 @@ inline int run_all() {
         if (!(condition)) {                                                                                          \
             std::cerr << "FAIL [" << ::testfw::g_current_test << "] " << __FILE__ << ":" << __LINE__ << ": "         \
                        << #condition << "\n";                                                                        \
+            ++::testfw::g_failures;                                                                                  \
+        }                                                                                                            \
+    } while (false)
+
+#define REQUIRE_THROWS(expression)                                                                                   \
+    do {                                                                                                             \
+        bool threw = false;                                                                                          \
+        try {                                                                                                        \
+            (void)(expression);                                                                                      \
+        } catch (...) {                                                                                              \
+            threw = true;                                                                                            \
+        }                                                                                                            \
+        if (!threw) {                                                                                                \
+            std::cerr << "FAIL [" << ::testfw::g_current_test << "] " << __FILE__ << ":" << __LINE__                \
+                      << ": expected exception from " << #expression << "\n";                                        \
             ++::testfw::g_failures;                                                                                  \
         }                                                                                                            \
     } while (false)

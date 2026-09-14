@@ -13,6 +13,23 @@ against when something behaves unexpectedly.
   key return `NOT_FOUND`.
 - The store holds at most one value per key.
 
+## Phase 2 — Pages and Pager
+
+- The file size is a multiple of `kPageSize` (4096), and
+  `page_count * kPageSize <= file size`.
+- Page 0 is the metadata page (magic `TKV1`, format version, page count,
+  free-list head). It is never handed out by `allocate_page()` and callers
+  cannot read, write, or free it.
+- Every page with id `< page_count` has a valid CRC-32 checksum, and its
+  header id equals its position in the file. A mismatch is corruption.
+- Every page on the free list has type `Free`. The list ends at
+  `kInvalidPageId`.
+- `allocate_page()` returns a page of type `Empty` with a zeroed payload, even
+  when it reuses a freed page.
+- Not yet guaranteed: atomicity across a crash. A crash mid-allocate or
+  mid-free can leak a page (never corrupt the free list), and nothing is
+  durable until `sync()`. The WAL (Phase 9) takes over from here.
+
 ## Core B+ Tree Invariants (from the project plan; apply once Phase 3+ lands)
 
 1. Keys inside each node are sorted.
