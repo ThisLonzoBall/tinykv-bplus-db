@@ -1,16 +1,11 @@
 #pragma once
 
-#include <stdexcept>
 #include <string>
 
 #include "storage/page.hpp"
+#include "storage/storage_error.hpp"
 
 namespace db::storage {
-
-class StorageError : public std::runtime_error {
-public:
-    using std::runtime_error::runtime_error;
-};
 
 // Maps one database file onto fixed-size pages. Page 0 holds metadata and is managed internally.
 class Pager {

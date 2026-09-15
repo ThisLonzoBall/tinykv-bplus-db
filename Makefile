@@ -9,6 +9,7 @@ CORE_SRCS := \
     src/storage/checksum.cpp \
     src/storage/page.cpp \
     src/storage/pager.cpp \
+    src/storage/leaf_page.cpp \
     src/protocol/parser.cpp \
     src/protocol/response.cpp \
     src/server/session.cpp \
@@ -21,7 +22,8 @@ TEST_SRCS := \
     tests/kv_store_tests.cpp \
     tests/parser_tests.cpp \
     tests/page_tests.cpp \
-    tests/pager_tests.cpp
+    tests/pager_tests.cpp \
+    tests/leaf_page_tests.cpp
 TEST_OBJS := $(patsubst tests/%.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_SRCS))
 
 DEPS := $(CORE_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(BUILD_DIR)/main.d $(BUILD_DIR)/client_main.d

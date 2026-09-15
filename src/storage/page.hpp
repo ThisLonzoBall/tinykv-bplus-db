@@ -16,6 +16,7 @@ enum class PageType : std::uint8_t {
     Empty = 0,
     Meta = 1,
     Free = 2,
+    Leaf = 3,
 };
 
 // Common header shared by every page. All integers are little-endian.
@@ -31,6 +32,9 @@ public:
 
     PageId id() const;
     void set_id(PageId id);
+
+    std::uint16_t read_u16(std::size_t offset) const;
+    void write_u16(std::size_t offset, std::uint16_t value);
 
     std::uint32_t read_u32(std::size_t offset) const;
     void write_u32(std::size_t offset, std::uint32_t value);

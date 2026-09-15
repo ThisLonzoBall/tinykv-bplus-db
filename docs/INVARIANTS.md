@@ -30,6 +30,24 @@ against when something behaves unexpectedly.
   mid-free can leak a page (never corrupt the free list), and nothing is
   durable until `sync()`. The WAL (Phase 9) takes over from here.
 
+## Phase 3 — Leaf Pages
+
+- Slots are stored in ascending key order, so a lookup is a binary search.
+  Every operation preserves that order.
+- A key appears at most once in a leaf. `insert` on an existing key replaces
+  its value rather than adding a second copy.
+- Records never overlap the slot array: records grow down from the end of the
+  page and slots grow up from the header.
+- `insert` either fully succeeds or leaves the page byte-for-byte unchanged and
+  returns false. A caller that sees false must split rather than assume the
+  entry landed.
+- Removals leave gaps, which `compact()` reclaims when the next insert needs
+  contiguous room. `free_after_compaction()` is the real space available.
+- Known limit: a record up to `kMaxLeafRecordSize` (just under a whole page) is
+  accepted, so one huge record can fill a leaf. Real B+ trees cap records at a
+  fraction of a page and spill the rest to overflow pages. Revisit when
+  splitting lands in Phase 4.
+
 ## Core B+ Tree Invariants (from the project plan; apply once Phase 3+ lands)
 
 1. Keys inside each node are sorted.

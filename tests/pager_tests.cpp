@@ -1,32 +1,15 @@
-#include <unistd.h>
-
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <string>
 
 #include "storage/pager.hpp"
+#include "temp_db_file.hpp"
 #include "test_framework.hpp"
 
 using namespace db::storage;
 
 namespace {
-
-class TempDbFile {
-public:
-    explicit TempDbFile(const std::string& name)
-        : path_((std::filesystem::temp_directory_path() /
-                 ("tinykv_" + name + "_" + std::to_string(::getpid()) + ".db"))
-                    .string()) {
-        std::filesystem::remove(path_);
-    }
-    ~TempDbFile() { std::filesystem::remove(path_); }
-
-    const std::string& path() const { return path_; }
-
-private:
-    std::string path_;
-};
 
 Page page_with_pattern(std::uint32_t seed) {
     Page page;
