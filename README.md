@@ -8,6 +8,8 @@ Phases 0–3 of the B+Tree distributed database project (see
   checksummed 4 KiB pages with a free list
 - B+ tree leaf pages (`src/storage/leaf_page.hpp`) storing sorted key/value
   records inside a page, with a sibling pointer for future range scans
+- leaf splitting: a full leaf divides in two and returns the separator key an
+  internal node will store
 
 The server still uses the in-memory store. It gets wired to the disk layers
 once the B+ tree above the leaves exists (Phases 4–5).

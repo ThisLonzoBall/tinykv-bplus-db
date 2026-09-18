@@ -1,5 +1,6 @@
 #include "storage/leaf_page.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <vector>
@@ -71,6 +72,46 @@ bool LeafPage::remove(std::string_view key) {
     }
     erase_slot(index);
     return true;
+}
+
+std::string LeafPage::split_into(LeafPage& right, PageId right_page_id) {
+    const std::uint16_t count = entry_count();
+    if (count < 2) {
+        throw StorageError("cannot split a leaf holding " + std::to_string(count) + " entries");
+    }
+    if (right.entry_count() != 0) {
+        throw StorageError("split target leaf is not empty");
+    }
+
+    std::size_t total = 0;
+    for (std::uint16_t i = 0; i < count; ++i) {
+        total += record_size(i);
+    }
+
+    // Split on bytes rather than entry count so one large record cannot leave a lopsided page.
+    std::uint16_t split = 0;
+    std::size_t accumulated = 0;
+    for (std::uint16_t i = 0; i < count; ++i) {
+        accumulated += record_size(i);
+        if (accumulated * 2 >= total) {
+            split = static_cast<std::uint16_t>(i + 1);
+            break;
+        }
+    }
+    split = std::max<std::uint16_t>(1, std::min<std::uint16_t>(split, static_cast<std::uint16_t>(count - 1)));
+
+    for (std::uint16_t i = split; i < count; ++i) {
+        if (!right.insert(key_view(i), value_view(i))) {
+            throw StorageError("split target leaf ran out of space");
+        }
+    }
+
+    set_entry_count(split);
+    compact();
+
+    right.set_next_leaf(next_leaf());
+    set_next_leaf(right_page_id);
+    return right.key_at(0);
 }
 
 std::string LeafPage::key_at(std::uint16_t index) const {

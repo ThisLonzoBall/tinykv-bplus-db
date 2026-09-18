@@ -2,6 +2,7 @@
 #include <map>
 #include <random>
 #include <string>
+#include <vector>
 
 #include "storage/leaf_page.hpp"
 #include "storage/pager.hpp"
@@ -22,6 +23,15 @@ std::string numbered_key(int i) {
     char buffer[16];
     std::snprintf(buffer, sizeof(buffer), "key%05d", i);
     return buffer;
+}
+
+// Inserts key00000, key00001, ... until the page is full; returns how many landed.
+int fill_leaf(LeafPage& leaf, const std::string& value, int first = 0) {
+    int inserted = 0;
+    while (leaf.insert(numbered_key(first + inserted), value)) {
+        ++inserted;
+    }
+    return inserted;
 }
 
 } // namespace
@@ -211,6 +221,175 @@ TEST_CASE(leaf_survives_a_pager_round_trip) {
     REQUIRE(leaf.next_leaf() == 7);
     for (int i = 0; i < 20; ++i) {
         REQUIRE(leaf.find(numbered_key(i)) == std::optional<std::string>("value" + std::to_string(i)));
+    }
+}
+
+TEST_CASE(split_divides_entries_and_keeps_every_one) {
+    Page left_page = empty_leaf();
+    LeafPage left(left_page);
+    const int total = fill_leaf(left, std::string(100, 'v'));
+
+    Page right_page = empty_leaf();
+    LeafPage right(right_page);
+    const std::string separator = left.split_into(right, 9);
+
+    REQUIRE(left.entry_count() > 0);
+    REQUIRE(right.entry_count() > 0);
+    REQUIRE(left.entry_count() + right.entry_count() == total);
+    REQUIRE(separator == right.key_at(0));
+    REQUIRE(left.key_at(static_cast<std::uint16_t>(left.entry_count() - 1)) < separator);
+
+    for (int i = 0; i < total; ++i) {
+        const std::string key = numbered_key(i);
+        REQUIRE(left.find(key).has_value() != right.find(key).has_value());
+    }
+}
+
+TEST_CASE(split_wires_the_sibling_chain) {
+    Page left_page = empty_leaf();
+    LeafPage left(left_page);
+    fill_leaf(left, std::string(100, 'v'));
+    left.set_next_leaf(77);
+
+    Page right_page = empty_leaf();
+    LeafPage right(right_page);
+    left.split_into(right, 9);
+
+    REQUIRE(left.next_leaf() == 9);
+    REQUIRE(right.next_leaf() == 77);
+}
+
+TEST_CASE(split_makes_room_for_the_insert_that_triggered_it) {
+    Page left_page = empty_leaf();
+    LeafPage left(left_page);
+    const std::string value(100, 'v');
+    const int total = fill_leaf(left, value);
+
+    Page right_page = empty_leaf();
+    LeafPage right(right_page);
+    const std::string separator = left.split_into(right, 9);
+
+    // A key past the end belongs on the right, one before the start on the left.
+    const std::string high_key = numbered_key(total);
+    REQUIRE(high_key > separator);
+    REQUIRE(right.insert(high_key, value));
+    REQUIRE(right.find(high_key) == std::optional<std::string>(value));
+
+    REQUIRE(left.insert("aaa", value));
+    REQUIRE(left.find("aaa") == std::optional<std::string>(value));
+}
+
+TEST_CASE(split_rejects_unusable_targets) {
+    Page left_page = empty_leaf();
+    LeafPage left(left_page);
+    fill_leaf(left, std::string(100, 'v'));
+
+    Page used_page = empty_leaf();
+    LeafPage used(used_page);
+    used.insert("x", "y");
+    REQUIRE_THROWS(left.split_into(used, 9));
+
+    Page single_page = empty_leaf();
+    LeafPage single(single_page);
+    single.insert("only", "one");
+    Page target_page = empty_leaf();
+    LeafPage target(target_page);
+    REQUIRE_THROWS(single.split_into(target, 9));
+}
+
+TEST_CASE(split_balances_pages_holding_variable_sized_records) {
+    Page left_page = empty_leaf();
+    LeafPage left(left_page);
+    left.insert("big", std::string(1500, 'b'));
+    for (int i = 0; i < 8; ++i) {
+        left.insert(numbered_key(i), "small");
+    }
+
+    Page right_page = empty_leaf();
+    LeafPage right(right_page);
+    left.split_into(right, 9);
+
+    REQUIRE(left.entry_count() > 0);
+    REQUIRE(right.entry_count() > 0);
+    REQUIRE(left.entry_count() + right.entry_count() == 9);
+    REQUIRE(left.find("big").has_value() != right.find("big").has_value());
+    for (int i = 0; i < 8; ++i) {
+        const std::string key = numbered_key(i);
+        REQUIRE(left.find(key).has_value() != right.find(key).has_value());
+    }
+}
+
+TEST_CASE(repeated_splits_keep_the_chain_sorted) {
+    std::vector<Page> pages;
+    pages.reserve(8);
+    pages.push_back(empty_leaf());
+
+    const std::string value(150, 'v');
+    int next_key = 0;
+    for (int inserted = 0; inserted < 120; ++inserted) {
+        LeafPage current(pages.back());
+        if (!current.insert(numbered_key(next_key), value)) {
+            pages.push_back(empty_leaf());
+            LeafPage left(pages[pages.size() - 2]);
+            LeafPage right(pages.back());
+            left.split_into(right, static_cast<PageId>(pages.size() - 1));
+            LeafPage retry(pages.back());
+            REQUIRE(retry.insert(numbered_key(next_key), value));
+        }
+        ++next_key;
+    }
+
+    REQUIRE(pages.size() > 1);
+    std::string previous;
+    int seen = 0;
+    for (std::size_t i = 0; i < pages.size(); ++i) {
+        LeafPage leaf(pages[i]);
+        for (std::uint16_t slot = 0; slot < leaf.entry_count(); ++slot) {
+            REQUIRE(leaf.key_at(slot) > previous);
+            previous = leaf.key_at(slot);
+            ++seen;
+        }
+        if (i + 1 < pages.size()) {
+            REQUIRE(leaf.next_leaf() == static_cast<PageId>(i + 1));
+        }
+    }
+    REQUIRE(seen == next_key);
+}
+
+TEST_CASE(a_split_chain_survives_a_pager_round_trip) {
+    TempDbFile file("split_chain");
+    PageId left_id = 0;
+    PageId right_id = 0;
+    int total = 0;
+    {
+        Pager pager(file.path());
+        left_id = pager.allocate_page();
+        right_id = pager.allocate_page();
+
+        Page left_page = empty_leaf();
+        LeafPage left(left_page);
+        total = fill_leaf(left, std::string(100, 'v'));
+
+        Page right_page = empty_leaf();
+        LeafPage right(right_page);
+        left.split_into(right, right_id);
+
+        pager.write_page(left_id, left_page);
+        pager.write_page(right_id, right_page);
+        pager.sync();
+    }
+
+    Pager reopened(file.path());
+    Page left_page = reopened.read_page(left_id);
+    LeafPage left(left_page);
+    REQUIRE(left.next_leaf() == right_id);
+
+    Page right_page = reopened.read_page(left.next_leaf());
+    LeafPage right(right_page);
+    REQUIRE(left.entry_count() + right.entry_count() == total);
+    for (int i = 0; i < total; ++i) {
+        const std::string key = numbered_key(i);
+        REQUIRE(left.find(key).has_value() != right.find(key).has_value());
     }
 }
 

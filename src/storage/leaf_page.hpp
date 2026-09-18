@@ -47,6 +47,9 @@ public:
 
     bool remove(std::string_view key);
 
+    // Moves the upper half (by bytes) into empty `right`, wires siblings, returns the separator key.
+    std::string split_into(LeafPage& right, PageId right_page_id);
+
     std::string key_at(std::uint16_t index) const;
     std::string value_at(std::uint16_t index) const;
 

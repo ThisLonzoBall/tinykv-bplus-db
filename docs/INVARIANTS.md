@@ -48,6 +48,22 @@ against when something behaves unexpectedly.
   fraction of a page and spill the rest to overflow pages. Revisit when
   splitting lands in Phase 4.
 
+## Phase 4 — Leaf Splitting
+
+- A split preserves every record: each key ends up in exactly one of the two
+  leaves, never both and never neither.
+- Every key left of the separator is smaller than it, every key right of it is
+  greater or equal, and the separator is the first key of the right leaf. That
+  is the value a parent node will store in Phase 5.
+- Both halves come out non-empty, so a split always makes progress.
+- The sibling chain stays intact: the right leaf inherits the left leaf's old
+  next pointer, and the left leaf points at the right one.
+- Splits divide on bytes, not entry count, so a single large record cannot
+  leave one half nearly empty.
+- Known limit: a record larger than about half a page may still not fit in
+  either half after a split. Real B+ trees cap record size and spill to
+  overflow pages; that is still deferred.
+
 ## Core B+ Tree Invariants (from the project plan; apply once Phase 3+ lands)
 
 1. Keys inside each node are sorted.
