@@ -20,6 +20,7 @@ constexpr std::size_t kMetaMagicOffset = kPageHeaderSize;
 constexpr std::size_t kMetaVersionOffset = kPageHeaderSize + 4;
 constexpr std::size_t kMetaPageCountOffset = kPageHeaderSize + 8;
 constexpr std::size_t kMetaFreeListHeadOffset = kPageHeaderSize + 12;
+constexpr std::size_t kMetaRootPageOffset = kPageHeaderSize + 16;
 
 constexpr std::size_t kFreeNextOffset = kPageHeaderSize;
 
@@ -60,6 +61,7 @@ void Pager::init_or_load(const std::string& path) {
     if (file_size == 0) {
         page_count_ = 1;
         free_list_head_ = kInvalidPageId;
+        root_page_id_ = kInvalidPageId;
         write_meta();
         return;
     }
@@ -78,6 +80,7 @@ void Pager::init_or_load(const std::string& path) {
 
     page_count_ = meta.read_u32(kMetaPageCountOffset);
     free_list_head_ = meta.read_u32(kMetaFreeListHeadOffset);
+    root_page_id_ = meta.read_u32(kMetaRootPageOffset);
 
     // A file longer than page_count is tolerated: allocate_page extends the file before updating metadata.
     if (page_count_ == 0 || static_cast<std::uint64_t>(page_count_) * kPageSize > file_size) {
@@ -128,6 +131,12 @@ void Pager::free_page(PageId id) {
     write_raw(id, page);
 
     free_list_head_ = id;
+    write_meta();
+}
+
+void Pager::set_root_page_id(PageId id) {
+    check_user_page_id(id);
+    root_page_id_ = id;
     write_meta();
 }
 
@@ -188,6 +197,7 @@ void Pager::write_meta() {
     meta.write_u32(kMetaVersionOffset, kFormatVersion);
     meta.write_u32(kMetaPageCountOffset, page_count_);
     meta.write_u32(kMetaFreeListHeadOffset, free_list_head_);
+    meta.write_u32(kMetaRootPageOffset, root_page_id_);
     write_raw(kMetaPageId, meta);
 }
 

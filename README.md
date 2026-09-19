@@ -10,6 +10,10 @@ Phases 0–3 of the B+Tree distributed database project (see
   records inside a page, with a sibling pointer for future range scans
 - leaf splitting: a full leaf divides in two and returns the separator key an
   internal node will store
+- internal nodes (`src/storage/internal_page.hpp`) holding separator keys and
+  child pointers
+- a multi-level B+ tree (`src/storage/btree.hpp`) with `get`/`put`, split
+  propagation and root splits, rooted at a page id kept in the metadata page
 
 The server still uses the in-memory store. It gets wired to the disk layers
 once the B+ tree above the leaves exists (Phases 4–5).

@@ -64,6 +64,27 @@ against when something behaves unexpectedly.
   either half after a split. Real B+ trees cap record size and spill to
   overflow pages; that is still deferred.
 
+## Phase 5 — Internal Nodes and the Tree
+
+- An internal node with n separators has exactly n + 1 children. Child 0 lives
+  in the header, child i + 1 lives beside separator i.
+- Keys in child i are less than separator i; keys in child i + 1 are greater
+  than or equal to it. A key equal to a separator routes right.
+- An internal split promotes the middle key to the parent, and that key is
+  stored in neither half afterwards. Leaf splits copy their separator up
+  instead, because leaves must keep every record.
+- The root is the only node allowed to be sparse. When it splits, a new root is
+  created above it and the tree gains a level; that is the only way height
+  grows.
+- The root page id lives in the metadata page, so reopening the file reopens
+  the same tree.
+- Separators are unique within a node: inserting one that is already present is
+  a bug and throws rather than silently duplicating a child pointer.
+- No parent pointers are stored. Inserts recurse down and handle splits on the
+  way back up, so the path is the call stack.
+- Not yet: deletion does not rebalance, and nothing is crash-safe. Phase 6
+  handles underflow; the WAL in Phase 9 handles crashes.
+
 ## Core B+ Tree Invariants (from the project plan; apply once Phase 3+ lands)
 
 1. Keys inside each node are sorted.

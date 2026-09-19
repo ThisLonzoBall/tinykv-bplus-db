@@ -10,6 +10,8 @@ CORE_SRCS := \
     src/storage/page.cpp \
     src/storage/pager.cpp \
     src/storage/leaf_page.cpp \
+    src/storage/internal_page.cpp \
+    src/storage/btree.cpp \
     src/protocol/parser.cpp \
     src/protocol/response.cpp \
     src/server/session.cpp \
@@ -23,7 +25,9 @@ TEST_SRCS := \
     tests/parser_tests.cpp \
     tests/page_tests.cpp \
     tests/pager_tests.cpp \
-    tests/leaf_page_tests.cpp
+    tests/leaf_page_tests.cpp \
+    tests/internal_page_tests.cpp \
+    tests/btree_tests.cpp
 TEST_OBJS := $(patsubst tests/%.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_SRCS))
 
 DEPS := $(CORE_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(BUILD_DIR)/main.d $(BUILD_DIR)/client_main.d

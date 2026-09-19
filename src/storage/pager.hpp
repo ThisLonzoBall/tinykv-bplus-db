@@ -27,6 +27,10 @@ public:
 
     void free_page(PageId id);
 
+    // kInvalidPageId until a tree is created in this file.
+    PageId root_page_id() const { return root_page_id_; }
+    void set_root_page_id(PageId id);
+
     // Writes are buffered by the OS until this is called.
     void sync();
 
@@ -43,6 +47,7 @@ private:
     int fd_ = -1;
     PageId page_count_ = 0;
     PageId free_list_head_ = kInvalidPageId;
+    PageId root_page_id_ = kInvalidPageId;
 };
 
 } // namespace db::storage

@@ -17,6 +17,7 @@ enum class PageType : std::uint8_t {
     Meta = 1,
     Free = 2,
     Leaf = 3,
+    Internal = 4,
 };
 
 // Common header shared by every page. All integers are little-endian.
